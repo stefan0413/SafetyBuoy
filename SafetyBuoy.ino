@@ -1,4 +1,6 @@
+#define LED 26
 #define BUZZER 25
+
 #define MORSE_DOT 200
 #define MORSE_DASH 600
 #define MORSE_PAUSE 400
@@ -8,6 +10,7 @@
 
 void setup() {
   pinMode(BUZZER, OUTPUT);
+  pinMode(LED, OUTPUT);
 }
 
 void loop() {
@@ -39,7 +42,12 @@ void sosSignal(){
 
 void beep(int duration) {
   digitalWrite(BUZZER, HIGH);
+  digitalWrite(LED, HIGH);
+  
   delay(duration);
+  
   digitalWrite(BUZZER, LOW);
+  digitalWrite(LED, LOW);
+  
   delay(MORSE_TINY_PAUSE);
 }
