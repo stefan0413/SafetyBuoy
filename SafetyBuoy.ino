@@ -1,53 +1,127 @@
 #define LED 26
 #define BUZZER 25
+#define BUTTON 4
 
-#define MORSE_DOT 200
-#define MORSE_DASH 600
-#define MORSE_PAUSE 400
-#define MORSE_TINY_PAUSE 200
-#define SOS_DELAY 2000
+#define HOLD_TIME 3000
 
+struct Step {
+  int duration;
+  int pauseAfter;
+};
+
+Step sosPattern[] = {
+  {200, 200}, {200, 200}, {200, 400},
+  {600, 200}, {600, 200}, {600, 400},
+  {200, 200}, {200, 200}, {200, 2000}
+};
+
+const int SOS_STEPS = 9;
+
+bool sosActive = false;
+bool holdHandled = false;
+bool signalOn = false;
+
+unsigned long holdStartTime = 0;
+unsigned long lastChange = 0;
+
+int currentStep = 0;
 
 void setup() {
   pinMode(BUZZER, OUTPUT);
   pinMode(LED, OUTPUT);
+  pinMode(BUTTON, INPUT_PULLUP);
 }
 
 void loop() {
-  sosSignal();
+  handleButton();
+
+  if (sosActive && !buttonPressed()) {
+    updateSos();
+  } else {
+    stopSignal();
+  }
 }
 
-void sosSignal(){
-  // S (...)
-  beep(MORSE_DOT);
-  beep(MORSE_DOT);
-  beep(MORSE_DOT);
-
-  delay(MORSE_PAUSE);
-
-  // O (---)
-  beep(MORSE_DASH);
-  beep(MORSE_DASH);
-  beep(MORSE_DASH);
-
-  delay(MORSE_PAUSE);
-
-  // S (...)
-  beep(MORSE_DOT);
-  beep(MORSE_DOT);
-  beep(MORSE_DOT);
-
-  delay(SOS_DELAY);
+bool buttonPressed() {
+  return digitalRead(BUTTON) == LOW;
 }
 
-void beep(int duration) {
-  digitalWrite(BUZZER, HIGH);
-  digitalWrite(LED, HIGH);
-  
-  delay(duration);
-  
+void handleButton() {
+  if (!buttonPressed()) {
+    holdStartTime = 0;
+    holdHandled = false;
+    return;
+  }
+
+  if (holdStartTime == 0) {
+    holdStartTime = millis();
+    stopSignal();
+  }
+
+  if (!holdHandled && millis() - holdStartTime >= HOLD_TIME) {
+    holdHandled = true;
+
+    if (!sosActive) {
+      fastBeeps();
+      sosActive = true;
+      resetSos();
+    } else {
+      sosActive = false;
+      resetSos();
+      longBeep();
+    }
+  }
+}
+
+void updateSos() {
+  unsigned long now = millis();
+
+  if (signalOn) {
+    if (now - lastChange >= sosPattern[currentStep].duration) {
+      stopSignal();
+      signalOn = false;
+      lastChange = now;
+    }
+  } else {
+    if (now - lastChange >= sosPattern[currentStep].pauseAfter) {
+      currentStep = (currentStep + 1) % SOS_STEPS;
+
+      digitalWrite(BUZZER, HIGH);
+      digitalWrite(LED, HIGH);
+
+      signalOn = true;
+      lastChange = now;
+    }
+  }
+}
+
+void resetSos() {
+  currentStep = SOS_STEPS - 1;
+  signalOn = false;
+  lastChange = millis();
+  stopSignal();
+}
+
+void stopSignal() {
   digitalWrite(BUZZER, LOW);
   digitalWrite(LED, LOW);
-  
-  delay(MORSE_TINY_PAUSE);
+}
+
+void fastBeeps() {
+  for (int i = 0; i < 3; i++) {
+    blockingBeep(120);
+    delay(100);
+  }
+}
+
+void longBeep() {
+  blockingBeep(1000);
+}
+
+void blockingBeep(int duration) {
+  digitalWrite(BUZZER, HIGH);
+  digitalWrite(LED, HIGH);
+  delay(duration);
+  digitalWrite(BUZZER, LOW);
+  digitalWrite(LED, LOW);
 }
